@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizadora Sociométrica 5.0 - Edición Final</title>
+    
+    <!-- Fuente Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS (Excel) -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <!-- Vis.js (Grafos) -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <!-- html2pdf (PDF) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- SortableJS (Drag & Drop) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #0ea5e9; --primary-dark: #0284c7;
+            --auto-color: #8b5cf6; --auto-dark: #7c3aed;
+            --bg-body: #f8fafc; --bg-card: #ffffff;
+            --text-main: #1e293b; --text-muted: #64748b;
+            --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
+            --border: #e2e8f0; --radius: 12px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg-body); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* Header & Nav */
+        header { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .logo-box { width: 40px; height: 40px; background: linear-gradient(135deg, var(--primary), var(--auto-color)); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem; }
+        .app-title h1 { font-size: 1.25rem; font-weight: 700; color: #0f172a; }
+
+        nav.tabs { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 1.5rem; display: flex; gap: 1rem; overflow-x: auto; }
+        .tab-btn { background: none; border: none; padding: 1rem 0.5rem; color: var(--text-muted); font-weight: 600; font-size: 0.9rem; border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; transition: 0.2s; }
+        .tab-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .tab-btn.active { color: var(--primary-dark); border-bottom-color: var(--primary-dark); }
+        .tab-btn i { margin-right: 6px; }
+
+        /* Main */
+        main { flex: 1; overflow-y: auto; padding: 1.5rem; position: relative; }
+        .container { max-width: 1200px; margin: 0 auto; padding-bottom: 3rem; }
+        .hidden { display: none !important; }
+
+        /* Cards & Upload */
+        .card { background: var(--bg-card); border-radius: var(--radius); box-shadow: 0 2px 4px rgba(0,0,0,0.03); border: 1px solid var(--border); padding: 1.5rem; margin-bottom: 1.5rem; }
+        
+        .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .upload-grid { grid-template-columns: 1fr; } }
+
+        .upload-box { border: 2px dashed var(--border); border-radius: var(--radius); padding: 2rem; text-align: center; transition: 0.2s; background: #fff; }
+        .upload-box.active { border-color: var(--primary); background: #f0f9ff; }
+        
+        .file-status { margin-top: 10px; font-size: 0.85rem; font-weight: 600; }
+        .status-ok { color: var(--success); }
+        .status-wait { color: var(--text-muted); }
+
+        /* Tables */
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { background: #f8fafc; text-align: left; padding: 12px; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid var(--border); white-space: nowrap; }
+        td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: #334155; }
+        tr:hover td { background: #f1f5f9; }
+        
+        .badge { padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; display: inline-block; }
+        .badge.pop { background: #dbeafe; color: #1e40af; } 
+        .badge.rej { background: #fee2e2; color: #991b1b; } 
+        .badge.con { background: #fef3c7; color: #92400e; } 
+        .badge.ign { background: #f1f5f9; color: #64748b; } 
+        .badge.avg { background: #ffffff; border: 1px solid #cbd5e1; color: #475569; }
+
+        /* Buttons */
+        .btn { padding: 0.6rem 1.2rem; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; color: white; font-size: 0.9rem; }
+        .btn-primary { background: var(--primary); } .btn-primary:hover { background: var(--primary-dark); }
+        .btn-success { background: var(--success); } .btn-success:hover { background: #059669; }
+        .btn-danger { background: var(--danger); } .btn-danger:hover { background: #dc2626; }
+        .btn-auto { background: var(--auto-color); } .btn-auto:hover { background: var(--auto-dark); }
+        .btn-info { background: #64748b; } .btn-info:hover { background: #475569; }
+
+        /* Groups */
+        .groups-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; margin-top: 20px; }
+        .group-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .group-header { background: #e2e8f0; padding: 10px; font-weight: 700; font-size: 0.9rem; display: flex; justify-content: space-between; }
+        .group-list { min-height: 100px; padding: 10px; list-style: none; }
+        .student-item { background: white; padding: 8px; margin-bottom: 5px; border-radius: 6px; border: 1px solid var(--border); font-size: 0.85rem; cursor: move; display: flex; justify-content: space-between; }
+
+        /* Precision Colors */
+        .text-match { color: #15803d; font-weight: 600; }
+        .text-error { color: #b91c1c; font-weight: 600; }
+
+        /* Footer */
+        footer { text-align: center; padding: 1rem; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.8rem; background: white; }
+        footer a { color: var(--primary); text-decoration: none; font-weight: 700; }
+
+        /* Modals */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 100; }
+        .modal-content { background: white; padding: 2rem; border-radius: 16px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; }
+        .modal-close { float: right; cursor: pointer; font-size: 1.5rem; color: var(--text-muted); }
+        .instruction-step { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9; }
+        .instruction-step strong { color: var(--primary-dark); }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="brand">
+        <div class="logo-box"><i class="fa-solid fa-people-arrows"></i></div>
+        <div class="app-title">
+            <h1>Sociometría Pro 5.0</h1>
+            <p>Análisis Integral de Aula</p>
+        </div>
+    </div>
+    <button class="btn-icon" onclick="resetApp()" style="background:none; border:none; font-size:1.2rem; color:#64748b; cursor:pointer;" title="Reiniciar"><i class="fa-solid fa-rotate-right"></i></button>
+</header>
+
+<nav class="tabs">
+    <button class="tab-btn active" onclick="showTab('datos')" id="btn-datos"><i class="fa-solid fa-upload"></i> Datos</button>
+    <button class="tab-btn" onclick="showTab('sociograma')" id="btn-sociograma" disabled><i class="fa-solid fa-circle-nodes"></i> Sociograma</button>
+    <button class="tab-btn" onclick="showTab('percepcion')" id="btn-percepcion" disabled><i class="fa-solid fa-eye"></i> Análisis Percepción</button>
+    <button class="tab-btn" onclick="showTab('autopercepcion')" id="btn-autopercepcion" disabled><i class="fa-solid fa-brain"></i> Análisis Autopercepción</button>
+    <button class="tab-btn" onclick="showTab('contraste')" id="btn-contraste" disabled><i class="fa-solid fa-scale-balanced"></i> Contraste y Grupos</button>
+    <button class="tab-btn" onclick="showTab('exportacion')" id="btn-exportacion" disabled><i class="fa-solid fa-file-export"></i> Exportación</button>
+</nav>
+
+<main>
+    <!-- TAB 1: DATOS -->
+    <div id="tab-datos" class="container">
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <h2><i class="fa-solid fa-database"></i> Carga de Datos</h2>
+                    <p class="subtitle">Sube tus archivos Excel o CSV para comenzar el análisis.</p>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-info" onclick="toggleInstructions()"><i class="fa-solid fa-circle-question"></i> ¿Cómo funciona?</button>
+                    <button class="btn btn-primary" onclick="loadDemoData()"><i class="fa-solid fa-flask"></i> Cargar Demo</button>
+                </div>
+            </div>
+
+            <div class="upload-grid" style="margin-top:20px;">
+                <!-- Caja Percepción -->
+                <div class="upload-box" id="drop-perc" ondrop="handleDrop(event, 'perc')" ondragover="event.preventDefault(); this.classList.add('active')" ondragleave="this.classList.remove('active')">
+                    <i class="fa-solid fa-users-viewfinder" style="font-size: 2.5rem; color: var(--primary); margin-bottom: 1rem;"></i>
+                    <h3 style="justify-content: center; color: var(--primary);">Percepción (Realidad)</h3>
+                    <p style="font-size: 0.9rem; color: var(--text-muted);">Lo que opinan los compañeros.</p>
+                    <input type="file" id="file-perc" class="hidden" onchange="handleFileSelect(this, 'perc')" accept=".xlsx,.xls,.csv">
+                    <button class="btn btn-primary" style="margin-top: 10px;" onclick="document.getElementById('file-perc').click()">Seleccionar Archivo</button>
+                    <div id="status-perc" class="file-status status-wait">Esperando archivo...</div>
+                </div>
+
+                <!-- Caja Autopercepción -->
+                <div class="upload-box" id="drop-auto" ondrop="handleDrop(event, 'auto')" ondragover="event.preventDefault(); this.classList.add('active')" ondragleave="this.classList.remove('active')">
+                    <i class="fa-solid fa-head-side-virus" style="font-size: 2.5rem; color: var(--auto-color); margin-bottom: 1rem;"></i>
+                    <h3 style="justify-content: center; color: var(--auto-color);">Autopercepción</h3>
+                    <p style="font-size: 0.9rem; color: var(--text-muted);">Lo que cree el alumno que opinan.</p>
+                    <input type="file" id="file-auto" class="hidden" onchange="handleFileSelect(this, 'auto')" accept=".xlsx,.xls,.csv">
+                    <button class="btn btn-auto" style="margin-top: 10px;" onclick="document.getElementById('file-auto').click()">Seleccionar Archivo</button>
+                    <div id="status-auto" class="file-status status-wait">Esperando archivo...</div>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 2rem;">
+                <button class="btn btn-success" style="font-size: 1.1rem; padding: 1rem 2rem;" onclick="processAllData()">
+                    <i class="fa-solid fa-gears"></i> Procesar Todo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: SOCIOGRAMA -->
+    <div id="tab-sociograma" class="hidden" style="height: 100%; display: flex; flex-direction: column;">
+        <div class="card" style="flex: 1; padding: 0; overflow: hidden; display: flex; flex-direction: column; height: 100%;">
+            <div style="padding: 1rem; border-bottom: 1px solid var(--border); background: #f8fafc; display: flex; gap: 10px; align-items: center;">
+                <strong>Mostrar:</strong>
+                <button class="btn btn-primary" style="padding: 0.4rem 1rem; font-size:0.8rem;" onclick="renderSociogram('all')">Todo</button>
+                <button class="btn btn-success" style="padding: 0.4rem 1rem; font-size:0.8rem;" onclick="renderSociogram('pos')">Aceptaciones (+)</button>
+                <button class="btn btn-danger" style="padding: 0.4rem 1rem; font-size:0.8rem;" onclick="renderSociogram('neg')">Rechazos (-)</button>
+            </div>
+            <!-- Contenedor con altura explícita para evitar colapso -->
+            <div id="mynetwork" style="flex: 1; min-height: 500px; background: white;"></div>
+        </div>
+    </div>
+
+    <!-- TAB 3: ANÁLISIS PERCEPCIÓN -->
+    <div id="tab-percepcion" class="container hidden">
+        <div class="card">
+            <h2>Análisis de Percepción</h2>
+            <p class="subtitle">Aceptaciones y rechazos recibidos de las/los compañeras/os.</p>
+            <div class="table-responsive">
+                <table id="table-perc">
+                    <thead>
+                        <tr>
+                            <th>Estudiante</th>
+                            <th>Aceptaciones (+)</th>
+                            <th>Rechazos (-)</th>
+                            <th>Impacto</th>
+                            <th>Preferencia</th>
+                            <th>Estatus</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: ANÁLISIS AUTOPERCEPCIÓN -->
+    <div id="tab-autopercepcion" class="container hidden">
+        <div class="card">
+            <h2>Análisis de Autopercepción</h2>
+            <p class="subtitle">Cómo creen que las/os alumnas/os que son aceptadas/os por sus compañeras/os.</p>
+            <div class="table-responsive">
+                <table id="table-auto">
+                    <thead>
+                        <tr>
+                            <th>Estudiante</th>
+                            <th>Aceptaciones esperadas</th>
+                            <th>Rechazos esperados</th>
+                            <th>Impacto Esperado</th>
+                            <th>Preferencia Esperada</th>
+                            <th>Estatus Percibido</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 5: CONTRASTE Y GRUPOS -->
+    <div id="tab-contraste" class="container hidden">
+        <div class="card">
+            <h3><i class="fa-solid fa-scale-unbalanced"></i> Contraste: Realidad vs. Creencia</h3>
+            <p class="subtitle">Contraste entre la aceptación / rechazo esperado y lo que realmente se recibe.</p>
+            <div class="table-responsive">
+                <table id="table-contrast-status">
+                    <thead>
+                        <tr>
+                            <th>Estudiante</th>
+                            <th>Estatus Real</th>
+                            <th>Estatus Creencia</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3><i class="fa-solid fa-check-double"></i> Precisión al percibir la aceptación</h3>
+            <div class="table-responsive">
+                <table id="table-precision-pos">
+                    <thead>
+                        <tr>
+                            <th>Estudiante</th>
+                            <th>Espera aceptación</th>
+                            <th>Recibe aceptación</th>
+                            <th style="color: var(--success);">Aciertos</th>
+                            <th style="color: var(--danger);">Fallos</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3><i class="fa-solid fa-circle-xmark"></i> Precisión al percibir el rechazo</h3>
+            <div class="table-responsive">
+                <table id="table-precision-neg">
+                    <thead>
+                        <tr>
+                            <th>Estudiante</th>
+                            <th>Espera rechazo</th>
+                            <th>Recibe rechazo</th>
+                            <th style="color: var(--success);">Aciertos</th>
+                            <th style="color: var(--danger);">Fallos</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3><i class="fa-solid fa-users-rectangle"></i> Propuesta de Grupos de Trabajo</h3>
+            <p class="subtitle">Grupos equilibrados evitando rechazos mutuos. ¡Arrastra los nombres!</p>
+            <div style="margin-bottom: 10px;">
+                <label>Número de grupos: <input type="number" id="num-groups" value="4" min="2" max="10" style="width: 50px; padding: 5px; border: 1px solid var(--border); border-radius: 4px;"></label>
+                <button class="btn btn-primary" style="font-size: 0.8rem; padding: 4px 8px;" onclick="generateGroups()">Generar</button>
+            </div>
+            <div id="groups-wrapper" class="groups-container"></div>
+        </div>
+    </div>
+
+    <!-- TAB 6: EXPORTACIÓN -->
+    <div id="tab-exportacion" class="container hidden">
+        <div class="card" style="text-align: center; padding: 3rem;">
+            <h2><i class="fa-solid fa-file-export"></i> Centro de Descargas</h2>
+            <p style="margin-bottom: 2rem; color: var(--text-muted);">Genera informes detallados o guarda los datos en bruto.</p>
+            
+            <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="exportToPDF()" style="padding: 1rem 2rem;">
+                    <i class="fa-solid fa-file-pdf"></i> Informe PDF Profesional
+                </button>
+                <button class="btn btn-success" onclick="exportToExcel()" style="padding: 1rem 2rem;">
+                    <i class="fa-solid fa-file-excel"></i> Exportar Datos Excel
+                </button>
+            </div>
+
+            <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border);">
+                <button class="btn btn-danger" onclick="resetApp()">
+                    <i class="fa-solid fa-trash"></i> Limpiar Datos y Reiniciar
+                </button>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<footer>
+    <p>Creado en 2026 por <a href="https://blogsaverroes.juntadeandalucia.es/ellocodelamochila" target="_blank">El loco de la mochila</a></p>
+</footer>
+
+<!-- MODAL INSTRUCCIONES -->
+<div id="instructionsModal" class="modal-overlay hidden" onclick="if(event.target===this) toggleInstructions()">
+    <div class="modal-content">
+        <span class="modal-close" onclick="toggleInstructions()">&times;</span>
+        <h2 style="color: var(--primary); margin-bottom: 1rem;">Instrucciones de Uso</h2>
+        
+        <div class="instruction-step">
+            <strong>1. Formato de Archivos</strong><br>
+            Usa archivos <code>.xlsx</code> (Excel) o <code>.csv</code>. Asegúrate de que las primeras 4 columnas sean:
+            <ul style="margin-left:20px; font-size:0.9em; margin-top:5px; color: var(--text-muted);">
+                <li><strong>Col 1:</strong> Emisor (Alumno que responde)</li>
+                <li><strong>Col 2:</strong> Receptor (Alumno elegido)</li>
+                <li><strong>Col 3:</strong> Voto (1 para positivo, -1 para negativo)</li>
+                <li><strong>Col 4:</strong> Motivo (Texto explicativo)</li>
+            </ul>
+        </div>
+
+        <div class="instruction-step">
+            <strong>2. Carga de Datos</strong><br>
+            Arrastra el archivo de <strong>Realidad</strong> a la caja azul y el de <strong>Autopercepción</strong> (lo que creen que les votan) a la caja violeta.
+        </div>
+
+        <div class="instruction-step">
+            <strong>3. Procesar</strong><br>
+            Pulsa el botón verde "Procesar Todo". Si los nombres tienen tildes (ej. María), el sistema intentará detectarlos automáticamente.
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="btn btn-primary" onclick="toggleInstructions()">¡Entendido!</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- ESTADO Y LÓGICA ---
+    const App = {
+        data: { perc: [], auto: [] },
+        metrics: { perc: {}, auto: {} },
+        students: new Set(),
+        network: null // Vis.js instance
+    };
+
+    // --- MANEJO DE ARCHIVOS ---
+    function handleDrop(e, type) {
+        e.preventDefault();
+        document.getElementById(`drop-${type}`).classList.remove('active');
+        handleFiles(e.dataTransfer.files, type);
+    }
+    function handleFileSelect(input, type) { handleFiles(input.files, type); }
+
+    async function handleFiles(files, type) {
+        if (files.length === 0) return;
+        const file = files[0];
+        const buffer = await readFile(file);
+        
+        // SheetJS con configuración robusta para Tildes
+        const wb = XLSX.read(buffer, { type: 'array', codepage: 65001 }); // 65001 es UTF-8
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        
+        const rows = [];
+        for (let i = 1; i < json.length; i++) {
+            const row = json[i];
+            if (!row[0] || !row[1]) continue;
+            rows.push({
+                emisor: String(row[0]).trim(),
+                receptor: String(row[1]).trim(),
+                voto: parseInt(row[2]) || 0,
+                motivo: row[3] ? String(row[3]).trim() : ""
+            });
+        }
+        App.data[type] = rows;
+        
+        const statusEl = document.getElementById(`status-${type}`);
+        statusEl.textContent = `Archivo: ${file.name} (${rows.length} registros)`;
+        statusEl.className = "file-status status-ok";
+    }
+
+    function readFile(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    // --- PROCESAMIENTO ---
+    function processAllData() {
+        if (App.data.perc.length === 0) { alert("Por favor, carga al menos los datos de Percepción (Caja Azul)."); return; }
+        
+        App.students = new Set();
+        [...App.data.perc, ...App.data.auto].forEach(r => {
+            App.students.add(r.emisor);
+            App.students.add(r.receptor);
+        });
+
+        App.metrics.perc = calculateMetrics(App.data.perc, 'inbound');
+        App.metrics.auto = calculateMetrics(App.data.auto, 'outbound_as_inbound'); 
+        
+        renderTable('table-perc', App.metrics.perc);
+        renderTable('table-auto', App.metrics.auto);
+        renderContrastTables();
+        generateGroups();
+
+        // Habilitar pestañas
+        document.querySelectorAll('.tab-btn').forEach(b => b.disabled = false);
+        showTab('percepcion');
+        alert("¡Datos procesados correctamente!");
+    }
+
+    function calculateMetrics(rows, mode) {
+        const metrics = {};
+        App.students.forEach(s => {
+            metrics[s] = { name: s, pos: 0, neg: 0, listPos: [], listNeg: [] };
+        });
+
+        rows.forEach(r => {
+            let target = null, sourceName = "";
+            if (mode === 'inbound') { // Percepción: votos RECIBIDOS
+                target = metrics[r.receptor]; sourceName = r.emisor;
+            } else { // Autopercepción: expectativas (votos que el emisor cree recibir)
+                target = metrics[r.emisor]; sourceName = r.receptor;
+            }
+
+            if (target) {
+                if (r.voto > 0) { target.pos++; target.listPos.push(sourceName); } 
+                else { target.neg++; target.listNeg.push(sourceName); }
+            }
+        });
+
+        // Calcular Estatus
+        const all = Object.values(metrics);
+        if (all.length === 0) return metrics;
+        const meanPos = all.reduce((s, m) => s + m.pos, 0) / all.length;
+        const meanImp = all.reduce((s, m) => s + (m.pos + m.neg), 0) / all.length;
+
+        all.forEach(m => {
+            m.impact = m.pos + m.neg;
+            m.preference = m.pos - m.neg;
+            const highImp = m.impact >= meanImp;
+            
+            if (highImp && m.preference > (meanPos * 0.5)) m.status = "Popular";
+            else if (highImp && m.preference < 0) m.status = "Rechazado";
+            else if (highImp && Math.abs(m.preference) <= 1) m.status = "Controvertido";
+            else if (!highImp) m.status = "Ignorado";
+            else m.status = "Promedio";
+        });
+        return metrics;
+    }
+
+    // --- SOCIOGRAMA (ARREGLADO) ---
+    function renderSociogram(filter) {
+        if (!App.students.size) return;
+
+        // Limpiar previo
+        if (App.network) { App.network.destroy(); App.network = null; }
+
+        const nodes = Array.from(App.students).map(name => {
+            const st = App.metrics.perc[name]?.status;
+            let color = '#cbd5e1'; // Gris default
+            if (st === 'Popular') color = '#93c5fd'; // Azul claro
+            if (st === 'Rechazado') color = '#fca5a5'; // Rojo claro
+            return { id: name, label: name, color: { background: color, border: '#64748b' } };
+        });
+
+        const edges = [];
+        App.data.perc.forEach(r => {
+            if (filter === 'pos' && r.voto < 0) return;
+            if (filter === 'neg' && r.voto > 0) return;
+            
+            edges.push({
+                from: r.emisor,
+                to: r.receptor,
+                arrows: 'to',
+                color: { color: r.voto > 0 ? '#10b981' : '#ef4444', opacity: 0.6 },
+                dashes: r.voto < 0
+            });
+        });
+
+        const container = document.getElementById('mynetwork');
+        const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+        const options = {
+            physics: {
+                barnesHut: { gravitationalConstant: -3000, springConstant: 0.04 },
+                stabilization: { iterations: 100 }
+            },
+            interaction: { zoomView: true, dragView: true }
+        };
+        
+        App.network = new vis.Network(container, data, options);
+    }
+
+    // --- RENDERIZADO TABLAS ---
+    function renderTable(id, metrics) {
+        const tbody = document.querySelector(`#${id} tbody`);
+        tbody.innerHTML = '';
+        Object.values(metrics).sort((a,b) => b.preference - a.preference).forEach(m => {
+            let badge = 'avg';
+            if (m.status === 'Popular') badge = 'pop';
+            if (m.status === 'Rechazado') badge = 'rej';
+            if (m.status === 'Controvertido') badge = 'con';
+            if (m.status === 'Ignorado') badge = 'ign';
+            
+            tbody.innerHTML += `<tr>
+                <td>${m.name}</td>
+                <td style="text-align:center; color:var(--success); font-weight:bold;">${m.pos}</td>
+                <td style="text-align:center; color:var(--danger); font-weight:bold;">${m.neg}</td>
+                <td style="text-align:center;">${m.impact}</td>
+                <td style="text-align:center;">${m.preference > 0 ? '+'+m.preference : m.preference}</td>
+                <td><span class="badge ${badge}">${m.status}</span></td>
+            </tr>`;
+        });
+    }
+
+    function renderContrastTables() {
+        // Estatus
+        const tbodyStatus = document.querySelector('#table-contrast-status tbody');
+        tbodyStatus.innerHTML = '';
+        Array.from(App.students).sort().forEach(name => {
+            tbodyStatus.innerHTML += `<tr>
+                <td>${name}</td>
+                <td>${App.metrics.perc[name]?.status || '-'}</td>
+                <td>${App.metrics.auto[name]?.status || '-'}</td>
+            </tr>`;
+        });
+
+        // Precisión
+        renderPrecisionTable('table-precision-pos', 'listPos');
+        renderPrecisionTable('table-precision-neg', 'listNeg');
+    }
+
+    function renderPrecisionTable(id, prop) {
+        const tbody = document.querySelector(`#${id} tbody`);
+        tbody.innerHTML = '';
+        Array.from(App.students).sort().forEach(name => {
+            const real = App.metrics.perc[name]?.[prop] || [];
+            const auto = App.metrics.auto[name]?.[prop] || [];
+            const matches = auto.filter(x => real.includes(x));
+            const errors = [...auto.filter(x => !real.includes(x)), ...real.filter(x => !auto.includes(x))];
+            
+            tbody.innerHTML += `<tr>
+                <td>${name}</td>
+                <td>${auto.length ? auto.join(', ') : '-'}</td>
+                <td>${real.length ? real.join(', ') : '-'}</td>
+                <td class="text-match">${matches.length ? matches.join(', ') : '-'}</td>
+                <td class="text-error">${errors.length ? errors.join(', ') : '-'}</td>
+            </tr>`;
+        });
+    }
+
+    // --- GRUPOS ---
+    function generateGroups() {
+        const num = parseInt(document.getElementById('num-groups').value) || 4;
+        const students = Array.from(App.students).sort(() => 0.5 - Math.random());
+        const groups = Array.from({length:num}, () => []);
+
+        // Función de conflicto
+        const conflict = (g, s) => {
+            const sm = App.metrics.perc[s];
+            if (!sm) return false;
+            return g.some(m => {
+                const mm = App.metrics.perc[m];
+                // Rechazo mutuo
+                return (sm.listNeg.includes(m) && mm?.listNeg.includes(s));
+            });
+        };
+
+        students.forEach(s => {
+            groups.sort((a,b) => a.length - b.length);
+            let added = false;
+            for(let g of groups) {
+                if(!conflict(g, s)) { g.push(s); added=true; break; }
+            }
+            if(!added) groups[0].push(s); // Fallback
+        });
+
+        const wrapper = document.getElementById('groups-wrapper');
+        wrapper.innerHTML = '';
+        groups.forEach((g, i) => {
+            const listId = `group-${i}`;
+            const items = g.map(m => {
+                const st = App.metrics.perc[m]?.status;
+                let icon = '';
+                if(st === 'Popular') icon = '<i class="fa-solid fa-star" style="color:#fbbf24"></i>';
+                if(st === 'Rechazado') icon = '<i class="fa-solid fa-ban" style="color:#ef4444"></i>';
+                return `<div class="student-item"><span>${m}</span>${icon}</div>`;
+            }).join('');
+
+            const html = `
+            <div class="group-box">
+                <div class="group-header"><span>Grupo ${i+1}</span></div>
+                <div class="group-list" id="${listId}">${items}</div>
+            </div>`;
+            wrapper.innerHTML += html;
+            
+            setTimeout(() => {
+                new Sortable(document.getElementById(listId), { group: 'shared', animation: 150 });
+            }, 100);
+        });
+    }
+
+    // --- EXPORTACIÓN ---
+    function exportToPDF() {
+        // Crear contenedor temporal invisible
+        const tempDiv = document.createElement('div');
+        tempDiv.style.width = '800px';
+        tempDiv.style.padding = '20px';
+        tempDiv.style.fontFamily = 'sans-serif';
+
+        // Estilos para tablas PDF
+        const tableStyle = `width:100%; border-collapse:collapse; font-size:10px; margin-bottom:20px;`;
+        const thStyle = `background:#f3f4f6; border:1px solid #ccc; padding:5px; text-align:left; font-weight:bold;`;
+        const tdStyle = `border:1px solid #ccc; padding:5px;`;
+
+        const getTableHTML = (id, title) => {
+            const origTable = document.getElementById(id);
+            if(!origTable) return '';
+            let html = `<h3 style="margin-top:0; color:#0f172a; border-bottom:2px solid #0ea5e9; padding-bottom:5px;">${title}</h3>`;
+            html += `<table style="${tableStyle}"><thead>${origTable.querySelector('thead').innerHTML.replace(/th/g, `th style="${thStyle}"`)}</thead>`;
+            html += `<tbody>${origTable.querySelector('tbody').innerHTML.replace(/td/g, `td style="${tdStyle}"`)}</tbody></table>`;
+            return `<div class="pdf-page" style="page-break-after: always;">${html}</div>`;
+        };
+
+        // Portada
+        let content = `
+            <div style="text-align:center; padding-top:200px; page-break-after:always;">
+                <h1 style="color:#0ea5e9; font-size:40px; margin-bottom:10px;">Informe Sociométrico</h1>
+                <p style="font-size:18px; color:#64748b;">Generado el ${new Date().toLocaleDateString()}</p>
+                <div style="margin-top:50px; font-size:14px; color:#94a3b8;">
+                    Creado con Sociometría Pro 5.0<br>
+                    Por El loco de la mochila
+                </div>
+            </div>
+        `;
+
+        // Añadir páginas
+        content += getTableHTML('table-perc', '1. Análisis de Percepción');
+        content += getTableHTML('table-auto', '2. Análisis de Autopercepción');
+        content += getTableHTML('table-contrast-status', '3. Contraste de Estatus');
+        content += getTableHTML('table-precision-pos', '4. Precisión de Aceptación');
+        content += getTableHTML('table-precision-neg', '5. Precisión de Rechazo');
+
+        // Grupos
+        const groupsHTML = document.getElementById('groups-wrapper').innerHTML;
+        content += `<div class="pdf-page">
+            <h3 style="color:#0f172a; border-bottom:2px solid #0ea5e9;">6. Propuesta de Grupos</h3>
+            <div style="font-size:10px;">${groupsHTML}</div>
+        </div>`;
+
+        tempDiv.innerHTML = content;
+        
+        // Limpiar estilos drag de los grupos para el PDF
+        tempDiv.querySelectorAll('.group-box').forEach(el => {
+            el.style.border = '1px solid #ccc';
+            el.style.marginBottom = '10px';
+            el.style.padding = '10px';
+        });
+
+        html2pdf().from(tempDiv).set({
+            margin: 10,
+            filename: 'Informe_Sociometrico_Pro.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).save();
+    }
+
+    function exportToExcel() {
+        const wb = XLSX.utils.book_new();
+
+        const addSheet = (data, name) => {
+            const ws = XLSX.utils.json_to_sheet(data);
+            XLSX.utils.book_append_sheet(wb, ws, name);
+        };
+
+        // Datos Percepción
+        const percData = Object.values(App.metrics.perc).map(m => ({
+            Nombre: m.name, Estatus: m.status, Aceptaciones: m.pos, Rechazos: m.neg, Impacto: m.impact, Preferencia: m.preference
+        }));
+        addSheet(percData, "Percepción");
+
+        // Datos Auto
+        const autoData = Object.values(App.metrics.auto).map(m => ({
+            Nombre: m.name, Estatus_Percibido: m.status, Espera_Aceptacion: m.pos, Espera_Rechazo: m.neg
+        }));
+        addSheet(autoData, "Autopercepción");
+
+        XLSX.writeFile(wb, "Datos_Sociometria.xlsx");
+    }
+
+    // --- UTILS ---
+    function showTab(id) {
+        document.querySelectorAll('.container, #tab-sociograma, #tab-exportacion').forEach(el => el.classList.add('hidden'));
+        document.getElementById('tab-' + id).classList.remove('hidden');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + id).classList.add('active');
+        
+        // Redibujar grafo si se muestra la pestaña, importante para Vis.js
+        if (id === 'sociograma') {
+            setTimeout(() => renderSociogram('all'), 100); 
+        }
+    }
+
+    function toggleInstructions() {
+        const modal = document.getElementById('instructionsModal');
+        modal.classList.toggle('hidden');
+    }
+
+    function loadDemoData() {
+        const students = ["Ana", "Beto", "Carla", "Dani", "Elena"];
+        App.data.perc = students.flatMap(s => students.filter(t=>t!==s).slice(0,2).map(t => ({emisor:s, receptor:t, voto: Math.random()>0.3?1:-1, motivo:"Demo"})));
+        App.data.auto = students.flatMap(s => students.filter(t=>t!==s).slice(0,2).map(t => ({emisor:s, receptor:t, voto: Math.random()>0.3?1:-1, motivo:"Demo"})));
+        alert("Datos de demostración cargados. Pulsa 'Procesar Todo'.");
+        document.getElementById('status-perc').textContent = "Demo Cargada";
+        document.getElementById('status-auto').textContent = "Demo Cargada";
+    }
+
+    function resetApp() {
+        if(confirm("¿Seguro que quieres borrar todo y reiniciar?")) window.location.reload();
+    }
+</script>
+
+</body>
+</html>
